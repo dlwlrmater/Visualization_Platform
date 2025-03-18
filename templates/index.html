@@ -1,0 +1,2225 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>烟台市中心城区可视化</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css"/>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap-select/1.14.0-beta2/css/bootstrap-select.min.css"
+          rel="stylesheet">
+    <style>
+        html, body {
+            margin: 0;
+            padding: 0;
+            height: 100%;
+            overflow: hidden;
+        }
+
+        #map {
+            height: 100vh;
+            width: 100vw;
+        }
+
+        .leaflet-control-layers,
+        .leaflet-control-layers-copy {
+            max-height: 300px; /* 设置最大高度 */
+            overflow-y: auto; /* 超出高度时显示滚动条 */
+            min-width: 200px; /* 设置最小宽度 */
+            background: white; /* 背景颜色 */
+            padding: 10px; /* 内边距 */
+            border: 1px solid #ccc; /* 边框 */
+            box-sizing: border-box; /* 包含 padding 和 border */
+        }
+
+        /* 防止控件内容溢出 */
+        .leaflet-control-layers label,
+        .leaflet-control-layers-copy label {
+            word-wrap: break-word; /* 长文本自动换行 */
+            white-space: normal; /* 允许换行 */
+            margin-bottom: 5px; /* 增加间距 */
+        }
+
+        /* 调整滚动条的样式 */
+        .leaflet-control-layers::-webkit-scrollbar,
+        .leaflet-control-layers-copy::-webkit-scrollbar {
+            width: 8px;
+        }
+
+        .leaflet-control-layers::-webkit-scrollbar-thumb,
+        .leaflet-control-layers-copy::-webkit-scrollbar-thumb {
+            background: #ccc;
+            border-radius: 4px;
+        }
+
+        .leaflet-control-layers::-webkit-scrollbar-track,
+        .leaflet-control-layers-copy::-webkit-scrollbar-track {
+            background: #f1f1f1;
+        }
+
+        .leaflet-control-buttons {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 10px;
+        }
+
+        .leaflet-control-buttons button {
+            padding: 5px;
+            cursor: pointer;
+            background: white;
+            border: 1px solid #ccc;
+        }
+
+        .leaflet-control-zoom-to-all {
+            padding: 5px;
+            cursor: pointer;
+            background: white;
+            border: 1px solid #ccc;
+        }
+
+        .leaflet-legend {
+            background: white;
+            padding: 10px;
+            border: 1px solid #ccc;
+        }
+
+        .leaflet-legend .legend-item {
+            display: flex;
+            align-items: center;
+            margin-bottom: 5px;
+        }
+
+        .leaflet-legend .legend-color {
+            width: 20px;
+            height: 20px;
+            margin-right: 5px;
+        }
+
+        .leaflet-bottom.leaflet-left {
+            display: flex;
+            gap: 10px;
+        }
+
+        #extraFolderForm {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            z-index: 1000;
+            background: white;
+            padding: 10px;
+            border-radius: 5px;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+            max-width: 300px;
+            width: 100%;
+        }
+
+        .filter-level {
+            margin-bottom: 10px;
+        }
+
+        .filter-buttons {
+            display: flex;
+            gap: 5px;
+            margin-bottom: 5px;
+        }
+
+        .filter-buttons button {
+            flex: 1;
+            padding: 3px;
+            font-size: 12px;
+        }
+
+        .selectpicker {
+            width: 100%;
+        }
+
+        /* 添加加载指示器样式 */
+        #loading-indicator {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(255, 255, 255, 0.9);
+            padding: 20px;
+            border-radius: 5px;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.3);
+            z-index: 2000;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .spinner {
+            width: 40px;
+            height: 40px;
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #3498db;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        /* 添加控件折叠和展开的样式 - 更精确的高度控制 */
+        #currentLayerControl.control-collapsed {
+            width: auto !important;
+            min-width: unset !important;
+            padding: 5px !important;
+            height: auto !important;
+            max-height: 40px !important; /* 只保留标题栏高度 */
+            overflow: hidden !important;
+        }
+
+        #planLayerControl.control-collapsed {
+            width: auto !important;
+            min-width: unset !important;
+            padding: 5px !important;
+            height: auto !important;
+            max-height: 40px !important;
+            overflow: hidden !important;
+        }
+
+        #extraLayerControl.control-collapsed {
+            width: auto !important;
+            min-width: unset !important;
+            padding: 5px !important;
+            height: auto !important;
+            max-height: 40px !important;
+            overflow: hidden !important;
+        }
+
+        /* 确保展开状态下的高度正确 */
+        #currentLayerControl.control-expanded {
+            width: 300px !important;
+            min-width: 300px !important;
+            padding: 10px !important;
+            max-height: 300px !important;
+            overflow-y: auto !important;
+        }
+
+        #planLayerControl.control-expanded {
+            width: 300px !important;
+            min-width: 300px !important;
+            padding: 10px !important;
+            max-height: 300px !important;
+            overflow-y: auto !important;
+        }
+
+        #extraLayerControl.control-expanded {
+            width: 600px !important;
+            min-width: 600px !important;
+            padding: 10px !important;
+            max-height: 300px !important;
+            overflow-y: auto !important;
+        }
+
+        /* 确保图层名称正确显示 */
+        .leaflet-control-layers-overlays label {
+            display: block !important;
+            margin-left: 0 !important;
+            white-space: nowrap !important;
+            overflow: hidden !important;
+            text-overflow: ellipsis !important;
+            white-space: normal !important;
+            word-break: break-word !important;
+            max-width: 580px !important;
+        }
+
+        /* 确保控件在折叠状态下保持在正确位置 */
+        .leaflet-bottom .leaflet-control {
+            margin-bottom: 10px !important;
+            vertical-align: bottom !important;
+        }
+
+        /* 控件折叠状态下的位置调整 */
+        #currentLayerControl.control-collapsed,
+        #planLayerControl.control-collapsed,
+        #extraLayerControl.control-collapsed {
+            position: relative !important;
+            bottom: 0 !important;
+            margin-bottom: 10px !important;
+            align-self: flex-end !important;
+        }
+
+        /* 确保控件容器正确对齐 */
+        .leaflet-bottom .leaflet-left {
+            display: flex !important;
+            flex-direction: column !important;
+            align-items: flex-start !important;
+            justify-content: flex-end !important;
+            height: auto !important;
+        }
+
+        /* 添加对extraControl容器的特定选择器 */
+        .leaflet-control-layers-copy.control-collapsed,
+        #extraLayerControl.control-collapsed {
+            width: auto !important;
+            min-width: unset !important;
+            max-width: fit-content !important;
+            padding: 5px !important;
+            height: auto !important;
+            max-height: 40px !important;
+            overflow: hidden !important;
+        }
+
+        .leaflet-control-layers-copy.control-expanded,
+        #extraLayerControl.control-expanded {
+            width: 600px !important;
+            min-width: 600px !important;
+            padding: 10px !important;
+            max-height: 300px !important;
+            overflow-y: auto !important;
+        }
+
+        /* 自定义tooltip样式 */
+        .custom-tooltip {
+            background-color: white;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            padding: 5px;
+            font-size: 12px;
+            max-width: 300px;
+            box-shadow: 0 1px 5px rgba(0,0,0,0.4);
+        }
+
+        .custom-tooltip table {
+            margin: 0;
+            padding: 0;
+            width: 100%;
+        }
+
+        /* 图层名称tooltip样式 */
+        .layer-name-tooltip {
+            background-color: rgba(255, 255, 255, 0.9);
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            padding: 5px 8px;
+            font-size: 12px;
+            font-weight: bold;
+            box-shadow: 0 1px 5px rgba(0,0,0,0.2);
+        }
+    </style>
+</head>
+<body>
+<!-- Extra 文件夹筛选表单 -->
+
+
+<!-- 在筛选表单的最后添加按钮 -->
+<form id="extraFolderForm">
+    <!-- 其他筛选字段 -->
+    <div class="filter-level">
+        <label for="first_level">时间:</label>
+        <div class="filter-buttons">
+            <button type="button" class="btn btn-sm btn-secondary" onclick="selectAll('first_level')">选择全部</button>
+            <button type="button" class="btn btn-sm btn-secondary" onclick="deselectAll('first_level')">取消全部</button>
+        </div>
+        <select id="first_level" class="selectpicker" multiple data-live-search="true" title="时间"></select>
+    </div>
+    <div class="filter-level">
+        <label for="second_level">类型:</label>
+        <div class="filter-buttons">
+            <button type="button" class="btn btn-sm btn-secondary" onclick="selectAll('second_level')">选择全部</button>
+            <button type="button" class="btn btn-sm btn-secondary" onclick="deselectAll('second_level')">取消全部</button>
+        </div>
+        <select id="second_level" class="selectpicker" multiple data-live-search="true" title="类型"></select>
+    </div>
+    <div class="filter-level">
+        <label for="third_level">状态:</label>
+        <div class="filter-buttons">
+            <button type="button" class="btn btn-sm btn-secondary" onclick="selectAll('third_level')">选择全部</button>
+            <button type="button" class="btn btn-sm btn-secondary" onclick="deselectAll('third_level')">取消全部</button>
+        </div>
+        <select id="third_level" class="selectpicker" multiple data-live-search="true" title="状态"></select>
+    </div>
+    <button type="button" class="btn btn-primary mt-2" onclick="filterExtraFolders()">筛选</button>
+</form>
+
+
+<div id="map"></div>
+
+<!-- 视图管理控件 - 放在左侧更低的位置 -->
+<div style="position: absolute; top: 250px; left: 10px; z-index: 1000; background-color: white; padding: 5px; border-radius: 4px; box-shadow: 0 1px 5px rgba(0,0,0,0.4);">
+    <div style="text-align: center; font-weight: bold; margin-bottom: 5px; font-size: 12px;">视图管理</div>
+    <button onclick="saveViewDirectly()" style="display: block; width: 100%; margin-bottom: 5px; padding: 4px; background-color: #4CAF50; color: white; border: none; border-radius: 3px; cursor: pointer; font-size: 12px;">
+        💾 保存视图
+    </button>
+    <button onclick="document.getElementById('directFileInput').click()" style="display: block; width: 100%; padding: 4px; background-color: #2196F3; color: white; border: none; border-radius: 3px; cursor: pointer; font-size: 12px;">
+        📂 加载视图
+    </button>
+    <input type="file" id="directFileInput" style="display: none;" accept=".json" onchange="loadViewDirectly(this.files[0])">
+</div>
+
+<script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.6.0/jquery.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha3/dist/js/bootstrap.bundle.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/bootstrap-select/1.14.0-beta2/js/bootstrap-select.min.js"></script>
+<script>
+    const layerColors = [
+        "#FF0000", "#00FF00", "#0000FF", "#FF00FF", "#FFFF00",
+        "#00FFFF", "#FFA500", "#800080", "#008000", "#000080",
+        "#FF4500", "#ADFF2F", "#00CED1", "#8A2BE2", "#FF1493",
+        "#32CD32", "#6A5ACD", "#FF69B4", "#20B2AA", "#7B68EE",
+        
+        "#8B4513",  // 马鞍棕色
+        "#4169E1",  // 皇家蓝
+        "#9ACD32",  // 黄绿色
+        "#FF6347",  // 番茄红
+        "#BA55D3",  // 中等兰花紫
+        "#2E8B57",  // 海洋绿
+        "#DAA520",  // 金菊黄
+        "#800000",  // 栗色
+        "#E6E6FA",  // 淡紫色
+        "#FFA07A",  // 浅鲑鱼色
+        "#3CB371",  // 中海洋绿
+        "#F4A460",  // 沙褐色
+        "#9370DB",  // 中紫色
+        "#48D1CC",  // 中绿宝石
+        "#CD853F",  // 秘鲁色
+        "#DB7093"   // 苍紫罗兰红
+    ];
+
+    // 动态调整控件宽度
+    window.addEventListener('load', () => {
+        // 调整 layerControl 的宽度
+        const layerControlContainer = document.querySelector('.leaflet-control-layers');
+        if (layerControlContainer) {
+            const contentWidth = layerControlContainer.scrollWidth;
+            const minWidth = 300; // 设置最小宽度
+            const maxWidth = 500; // 设置最大宽度
+            layerControlContainer.style.width = `${Math.min(Math.max(contentWidth, minWidth), maxWidth)}px`;
+        }
+
+        // 调整中间控件的宽度
+        const layerControlCopyContainer = document.querySelector('.leaflet-control-layers-copy');
+        if (layerControlCopyContainer) {
+            const contentWidth = layerControlCopyContainer.scrollWidth;
+            const minWidth = 400; // 修改最小宽度为400
+            const maxWidth = 500; // 修改最大宽度为400
+            layerControlCopyContainer.style.width = `${Math.min(Math.max(contentWidth, minWidth), maxWidth)}px`;
+        }
+
+        // 调整新增控件的宽度
+        const extraLayerControl = document.getElementById('extraLayerControl');
+        if (extraLayerControl) {
+            const contentWidth = extraLayerControl.scrollWidth;
+            const minWidth = 600; // 设置最小宽度
+            const maxWidth = 600; // 设置最大宽度
+            extraLayerControl.style.width = `${Math.min(Math.max(contentWidth, minWidth), maxWidth)}px`;
+        }
+    });
+
+
+
+    function getLayerColor(layerName) {
+        let hash = 0;
+        for (let i = 0; i < layerName.length; i++) {
+            hash = (hash << 5) - hash + layerName.charCodeAt(i);
+            hash |= 0;
+        }
+        return layerColors[Math.abs(hash) % layerColors.length];
+    }
+
+    // 使用高德地图服务 - 移动图层控制器位置
+    const map = L.map('map').setView([37.4638, 121.4479], 13);
+
+    // 基础图层组
+    const baseMaps = {};
+
+    // 高德地图矢量图层
+    const gaodeNormal = L.tileLayer('https://webrd0{s}.is.autonavi.com/appmaptile?lang=zh_cn&size=1&scale=1&style=8&x={x}&y={y}&z={z}', {
+        subdomains: ['1', '2', '3', '4'],
+        attribution: '&copy; 高德地图'
+    });
+    baseMaps["高德标准地图"] = gaodeNormal;
+
+    // 高德卫星影像图层
+    const gaodeSatellite = L.tileLayer('https://webst0{s}.is.autonavi.com/appmaptile?style=6&x={x}&y={y}&z={z}', {
+        subdomains: ['1', '2', '3', '4'],
+        attribution: '&copy; 高德地图'
+    });
+    baseMaps["高德卫星影像"] = gaodeSatellite;
+
+    // 高德影像注记图层
+    const gaodeLabels = L.tileLayer('https://webst0{s}.is.autonavi.com/appmaptile?style=8&x={x}&y={y}&z={z}', {
+        subdomains: ['1', '2', '3', '4'],
+        attribution: '&copy; 高德地图'
+    });
+    baseMaps["高德影像+路网"] = L.layerGroup([gaodeSatellite, gaodeLabels]);
+
+    // 添加默认图层
+    gaodeNormal.addTo(map);
+
+    // 添加图层控制器到地图左上角，避免与右上角控件重叠
+    L.control.layers(baseMaps, null, {position: 'topleft'}).addTo(map);
+
+    const layerGroup = L.layerGroup().addTo(map);
+    
+    const extraControl = L.control.layers(null, null, {collapsed: false, position: 'bottomleft'}).addTo(map);
+    // 修改layerControl的创建方式
+    const layerControl = L.control.layers(null, null, {
+        position: 'bottomleft',
+        collapsed: false
+    });
+
+    // 保存原始的onAdd方法
+    const originalOnAdd = L.Control.Layers.prototype.onAdd;
+
+    // 为所有三个控件添加通用的折叠/展开处理函数
+    function setupCollapseButton(collapseBtn, container, containerType) {
+        collapseBtn.onclick = function(e) {
+            // 阻止事件冒泡，避免触发地图点击事件
+            L.DomEvent.stopPropagation(e);
+            L.DomEvent.preventDefault(e);
+            
+            // 根据控件类型获取正确的容器
+            let currentContainer;
+            if (containerType === 'current') {
+                currentContainer = document.getElementById('currentLayerControl');
+            } else if (containerType === 'plan') {
+                currentContainer = document.getElementById('planLayerControl');
+            } else if (containerType === 'extra') {
+                currentContainer = document.getElementById('extraLayerControl');
+            }
+            
+            if (!currentContainer) {
+                console.error('找不到控件容器:', containerType);
+                return;
+            }
+            
+            if (currentContainer.classList.contains('control-collapsed')) {
+                // 展开
+                currentContainer.classList.remove('control-collapsed');
+                currentContainer.classList.add('control-expanded');
+                this.innerHTML = '−';
+            } else {
+                // 折叠
+                currentContainer.classList.remove('control-expanded');
+                currentContainer.classList.add('control-collapsed');
+                this.innerHTML = '+';
+            }
+        };
+    }
+
+    // 修改layerControl的onAdd方法
+    layerControl.onAdd = function (map) {
+        // 调用原始的onAdd方法获取控件容器
+        const container = originalOnAdd.call(this, map);
+        
+        // 添加唯一ID
+        container.id = 'currentLayerControl';
+        
+        // 创建标题栏，包含标题和折叠按钮
+        const headerDiv = document.createElement('div');
+        headerDiv.style.display = 'flex';
+        headerDiv.style.justifyContent = 'space-between';
+        headerDiv.style.alignItems = 'center';
+        headerDiv.style.marginBottom = '5px';
+        
+        // 添加标题
+        const titleDiv = document.createElement('div');
+        titleDiv.innerHTML = '<strong>现状图层</strong>';
+        headerDiv.appendChild(titleDiv);
+        
+        // 添加折叠按钮
+        const collapseBtn = document.createElement('button');
+        collapseBtn.innerHTML = '−';  // 使用减号表示折叠
+        collapseBtn.style.width = '24px';
+        collapseBtn.style.height = '24px';
+        collapseBtn.style.border = '1px solid #ccc';
+        collapseBtn.style.borderRadius = '3px';
+        collapseBtn.style.background = 'white';
+        collapseBtn.style.cursor = 'pointer';
+        collapseBtn.title = '折叠/展开';
+        
+        // 设置折叠/展开功能
+        setupCollapseButton(collapseBtn, container, 'current');
+        
+        headerDiv.appendChild(collapseBtn);
+        
+        // 获取内容区域
+        const contentDiv = container.querySelector('.leaflet-control-layers-list');
+        const buttonsDiv = document.createElement('div');
+        buttonsDiv.className = 'leaflet-control-buttons';
+        buttonsDiv.innerHTML = `
+            <button style="float: left;">全部打开</button>
+            <button style="float: right;">全部关闭</button>
+        `;
+        
+        // 插入标题栏和按钮区域
+        container.insertBefore(headerDiv, container.firstChild);
+        container.insertBefore(buttonsDiv, contentDiv);
+        
+        // 添加按钮事件处理
+        buttonsDiv.querySelector('button:nth-child(1)').onclick = () => {
+            Object.values(currentLayers).forEach(layer => map.addLayer(layer));
+            updateLegend({...currentLayers, ...planLayers, ...extraLayers});
+        };
+        
+        buttonsDiv.querySelector('button:nth-child(2)').onclick = () => {
+            Object.values(currentLayers).forEach(layer => map.removeLayer(layer));
+            updateLegend({...currentLayers, ...planLayers, ...extraLayers});
+        };
+        
+        // 初始设置为展开状态
+        container.classList.add('control-expanded');
+        
+        return container;
+    };
+
+    // 修改layerControlCopy的onAdd方法
+    const layerControlCopy = L.control.layers(null, null, {
+        position: 'bottomleft',
+        collapsed: false
+    });
+
+    // 修改layerControlCopy的onAdd方法
+    layerControlCopy.onAdd = function (map) {
+        // 调用原始的onAdd方法获取控件容器
+        const container = originalOnAdd.call(this, map);
+        
+        // 添加唯一ID
+        container.id = 'planLayerControl';
+        
+        // 创建标题栏，包含标题和折叠按钮
+        const headerDiv = document.createElement('div');
+        headerDiv.style.display = 'flex';
+        headerDiv.style.justifyContent = 'space-between';
+        headerDiv.style.alignItems = 'center';
+        headerDiv.style.marginBottom = '5px';
+        
+        // 添加标题
+        const titleDiv = document.createElement('div');
+        titleDiv.innerHTML = '<strong>规划图层</strong>';
+        headerDiv.appendChild(titleDiv);
+        
+        // 添加折叠按钮
+        const collapseBtn = document.createElement('button');
+        collapseBtn.innerHTML = '−';  // 使用减号表示折叠
+        collapseBtn.style.width = '24px';
+        collapseBtn.style.height = '24px';
+        collapseBtn.style.border = '1px solid #ccc';
+        collapseBtn.style.borderRadius = '3px';
+        collapseBtn.style.background = 'white';
+        collapseBtn.style.cursor = 'pointer';
+        collapseBtn.title = '折叠/展开';
+        
+        // 设置折叠/展开功能
+        setupCollapseButton(collapseBtn, container, 'plan');
+        
+        headerDiv.appendChild(collapseBtn);
+        
+        // 获取内容区域
+        const contentDiv = container.querySelector('.leaflet-control-layers-list');
+        const buttonsDiv = document.createElement('div');
+        buttonsDiv.className = 'leaflet-control-buttons';
+        buttonsDiv.innerHTML = `
+            <button style="float: left;">全部打开</button>
+            <button style="float: right;">全部关闭</button>
+        `;
+        
+        // 插入标题栏和按钮区域
+        container.insertBefore(headerDiv, container.firstChild);
+        container.insertBefore(buttonsDiv, contentDiv);
+        
+        // 添加按钮事件处理
+        buttonsDiv.querySelector('button:nth-child(1)').onclick = () => {
+            Object.values(planLayers).forEach(layer => map.addLayer(layer));
+            updateLegend({...currentLayers, ...planLayers, ...extraLayers});
+        };
+        
+        buttonsDiv.querySelector('button:nth-child(2)').onclick = () => {
+            Object.values(planLayers).forEach(layer => map.removeLayer(layer));
+            updateLegend({...currentLayers, ...planLayers, ...extraLayers});
+        };
+        
+        // 初始设置为展开状态
+        container.classList.add('control-expanded');
+        
+        return container;
+    };
+
+    // 添加到地图
+    layerControl.addTo(map);
+    layerControlCopy.addTo(map);
+
+    // 恢复原始的图例创建逻辑，但优化内存使用
+    function updateLegend(layers) {
+        // 获取或创建图例容器
+        let legendContainer = document.getElementById('legend-container');
+        if (!legendContainer) {
+            legendContainer = document.createElement('div');
+            legendContainer.id = 'legend-container';
+            legendContainer.className = 'leaflet-legend';
+            legendContainer.style.maxHeight = '300px';
+            legendContainer.style.overflowY = 'auto';
+            
+            // 创建标题
+            const titleDiv = document.createElement('div');
+            titleDiv.innerHTML = '<strong>图例</strong>';
+            legendContainer.appendChild(titleDiv);
+            
+            // 创建内容区域
+            const contentDiv = document.createElement('div');
+            contentDiv.id = 'legend-content';
+            legendContainer.appendChild(contentDiv);
+            
+            // 添加到地图
+            legend.onAdd = function() {
+                return legendContainer;
+            };
+            legend.addTo(map);
+        }
+        
+        // 内存优化：限制图例中显示的图层数量
+        const maxLegendItems = 40;
+        const visibleLayers = {};
+        let count = 0;
+        
+        // 只添加当前可见的图层到图例
+        Object.entries(layers).forEach(([name, layer]) => {
+            if (map.hasLayer(layer) && count < maxLegendItems) {
+                visibleLayers[name] = layer;
+                count++;
+            }
+        });
+        
+        // 更新图例内容
+        const legendContent = document.getElementById('legend-content');
+        if (legendContent) {
+            legendContent.innerHTML = '';
+            
+            if (count >= maxLegendItems) {
+                const notice = document.createElement('div');
+                notice.textContent = `显示前 ${maxLegendItems} 个图层 (总共 ${Object.keys(layers).filter(name => map.hasLayer(layers[name])).length} 个)`;
+                notice.style.fontStyle = 'italic';
+                notice.style.marginBottom = '5px';
+                legendContent.appendChild(notice);
+            }
+            
+            Object.entries(visibleLayers).forEach(([name, layer]) => {
+            if (map.hasLayer(layer)) {
+                    const item = document.createElement('div');
+                    item.className = 'legend-item';
+                    
+                    const color = document.createElement('div');
+                    color.className = 'legend-color';
+                    color.style.backgroundColor = getLayerColor(name);
+                    
+                    const label = document.createElement('div');
+                    label.textContent = name;
+                    
+                    item.appendChild(color);
+                    item.appendChild(label);
+                    legendContent.appendChild(item);
+                }
+            });
+        }
+    }
+
+
+    function getAllVisibleLayersBounds() {
+        // 定义烟台市的默认视图范围
+        const defaultBounds = L.latLngBounds(
+            L.latLng(37.3638, 121.2479), // 西南角
+            L.latLng(37.5638, 121.6479)  // 东北角
+        );
+
+        // 创建一个新的边界对象
+        let bounds = null;
+        let hasVisibleLayers = false;
+        
+        console.log("开始计算所有可见图层的边界");
+        
+        // 直接处理我们知道的图层对象
+        const allLayerObjects = [
+            ...Object.entries(currentLayers),
+            ...Object.entries(planLayers),
+            ...Object.entries(extraLayers)
+        ];
+        
+        console.log(`找到 ${allLayerObjects.length} 个图层对象`);
+        
+        // 遍历并处理每个图层
+        for (const [name, layer] of allLayerObjects) {
+            if (!map.hasLayer(layer)) {
+                console.log(`图层 ${name} 不可见，跳过`);
+                continue;
+            }
+            
+            console.log(`处理可见图层: ${name}`);
+            
+            try {
+                if (layer instanceof L.FeatureGroup || layer instanceof L.LayerGroup) {
+                    console.log(`${name} 是图层组，处理子图层`);
+                    const subLayers = layer.getLayers();
+                    
+                    for (const subLayer of subLayers) {
+                        // 检查子图层是否有getBounds方法
+                        if (subLayer.getBounds && typeof subLayer.getBounds === 'function') {
+                            const subBounds = subLayer.getBounds();
+                            if (subBounds && subBounds.isValid()) {
+                                console.log(`添加子图层边界: ${subBounds.toBBoxString()}`);
+                                if (bounds === null) {
+                                    bounds = L.latLngBounds(subBounds);
+                                } else {
+                                    bounds.extend(subBounds);
+                                }
+                                hasVisibleLayers = true;
+                            }
+                        } 
+                        // 检查图层是否有getBounds方法
+                        else if (layer.getBounds && typeof layer.getBounds === 'function') {
+                            const layerBounds = layer.getBounds();
+                            if (layerBounds && layerBounds.isValid()) {
+                                console.log(`添加图层边界 ${name}: ${layerBounds.toBBoxString()}`);
+                                if (bounds === null) {
+                                    bounds = L.latLngBounds(layerBounds);
+                                } else {
+                                    bounds.extend(layerBounds);
+                                }
+                                hasVisibleLayers = true;
+                            } else {
+                                console.log(`图层 ${name} 的边界无效`);
+                            }
+                        } else {
+                            console.log(`图层 ${name} 没有getBounds方法`);
+                        }
+                    }
+                } 
+                // 检查图层是否有getBounds方法
+                else if (layer.getBounds && typeof layer.getBounds === 'function') {
+                    const layerBounds = layer.getBounds();
+                    if (layerBounds && layerBounds.isValid()) {
+                        console.log(`添加图层边界 ${name}: ${layerBounds.toBBoxString()}`);
+                        if (bounds === null) {
+                            bounds = L.latLngBounds(layerBounds);
+                        } else {
+                            bounds.extend(layerBounds);
+                        }
+                        hasVisibleLayers = true;
+                    } else {
+                        console.log(`图层 ${name} 的边界无效`);
+                    }
+                } else {
+                    console.log(`图层 ${name} 没有getBounds方法`);
+                }
+            } catch (e) {
+                console.error(`处理图层 ${name} 时出错:`, e);
+            }
+        }
+        
+        // 如果没有有效边界，返回默认值
+        if (!hasVisibleLayers || !bounds || !bounds.isValid()) {
+            console.log("没有找到有效的图层边界，使用默认范围");
+            return defaultBounds;
+        }
+        
+        console.log(`最终计算的边界: ${bounds.toBBoxString()}`);
+        return bounds;
+    }
+
+    const zoomToAllControl = L.control({ position: 'topleft' });
+    zoomToAllControl.onAdd = function (map) {
+        const div = L.DomUtil.create('div', 'leaflet-control-zoom-to-all');
+        div.innerHTML = `<button>全图</button>`;
+        div.querySelector('button').onclick = function() {
+            console.log("点击了全图按钮");
+            try {
+            const bounds = getAllVisibleLayersBounds();
+                console.log(`获取到的边界: ${bounds.toBBoxString()}`);
+                
+                // 使用适当的padding和最大缩放级别
+                map.fitBounds(bounds, {
+                    padding: [50, 50],
+                    maxZoom: 15,
+                    animate: true
+                });
+                
+                console.log("完成缩放操作");
+            } catch (e) {
+                console.error('缩放到全图时出错:', e);
+                // 出错时回到默认视图
+                map.setView([37.4638, 121.4479], 13);
+            }
+        };
+        return div;
+    };
+    zoomToAllControl.addTo(map);
+
+    const legend = L.control({position: 'bottomright'});
+    legend.onAdd = function (map) {
+        const div = L.DomUtil.create('div', 'leaflet-legend leaflet-control');
+        div.style.backgroundColor = 'white';
+        div.style.padding = '6px 8px';
+        div.style.border = '2px solid rgba(0,0,0,0.2)';
+        div.style.borderRadius = '4px';
+        div.style.boxShadow = 'none';
+        div.style.maxHeight = '300px'; // 设置最大高度
+        div.style.overflowY = 'auto';  // 添加垂直滚动条
+        div.style.overflowX = 'hidden'; // 隐藏水平滚动条
+        div.innerHTML = '<strong>图例</strong>';
+        return div;
+    };
+    legend.addTo(map);
+
+    let currentLayers = {};
+    let planLayers = {};
+    let extraLayers = {};
+
+    // 加载 Extra 文件夹列表
+    function loadExtraFolders() {
+        fetch('/extra-folders')
+                .then(response => response.json())
+                .then(folders => {
+                    const extraFolderSelect = document.getElementById('extra_folder');
+                    folders.forEach(folder => {
+                        const option = document.createElement('option');
+                        option.value = folder;
+                        option.textContent = folder;
+                        extraFolderSelect.appendChild(option);
+                    });
+                    $(extraFolderSelect).selectpicker('refresh');
+                })
+                .catch(error => {
+                    console.error("Failed to load extra folders:", error);
+                });
+    }
+
+    // 加载 Extra 文件夹层级列表
+    function loadExtraFolderLevels() {
+        fetch('/extra-folder-levels')
+            .then(response => response.json())
+            .then(data => {
+                const firstLevelSelect = document.getElementById('first_level');
+                const secondLevelSelect = document.getElementById('second_level');
+                const thirdLevelSelect = document.getElementById('third_level');
+
+                // 清空当前选项
+                firstLevelSelect.innerHTML = '';
+                secondLevelSelect.innerHTML = '';
+                thirdLevelSelect.innerHTML = '';
+
+                // 添加第一层级选项
+                data.first_level.forEach(folder => {
+                    const option = document.createElement('option');
+                    option.value = folder;
+                    option.textContent = folder;
+                    firstLevelSelect.appendChild(option);
+                });
+
+                // 添加第二层级选项
+                data.second_level.forEach(folder => {
+                    const option = document.createElement('option');
+                    option.value = folder;
+                    option.textContent = folder;
+                    secondLevelSelect.appendChild(option);
+                });
+
+                // 添加第三层级选项
+                data.third_level.forEach(folder => {
+                    const option = document.createElement('option');
+                    option.value = folder;
+                    option.textContent = folder;
+                    thirdLevelSelect.appendChild(option);
+                });
+
+                // 刷新下拉框
+                $(firstLevelSelect).selectpicker('refresh');
+                $(secondLevelSelect).selectpicker('refresh');
+                $(thirdLevelSelect).selectpicker('refresh');
+            })
+            .catch(error => {
+                console.error("Failed to load extra folder levels:", error);
+            });
+    }
+
+    // 内存优化：添加垃圾回收辅助函数
+    function clearMemory() {
+        // 强制浏览器进行垃圾回收
+        if (window.gc) {
+            window.gc();
+        } else if (window.opera && window.opera.collect) {
+            window.opera.collect();
+        } else {
+            try {
+                // 创建大量对象迫使浏览器进行垃圾回收
+                const arr = new Array(1000);
+                for (let i = 0; i < 1000; i++) {
+                    arr[i] = new Array(10000).join('x');
+                }
+                arr.length = 0;
+            } catch (e) {
+                console.log("内存清理尝试");
+            }
+        }
+    }
+    
+    // 添加一个全局标志，控制是否允许筛选
+    let filterEnabled = false;
+
+    // 修改筛选函数，确保只能通过按钮点击触发
+    function filterExtraFolders() {
+        // 如果不是通过按钮点击触发，则直接返回
+        if (!filterEnabled) {
+            console.log('筛选被阻止：不是通过按钮点击触发');
+            return;
+        }
+        
+        console.log('开始执行筛选...');
+        
+        // 显示加载指示器
+        const loadingIndicator = document.getElementById('loading-indicator');
+        if (loadingIndicator) {
+            loadingIndicator.style.display = 'flex';
+        } else {
+            const newLoadingIndicator = document.createElement('div');
+            newLoadingIndicator.id = 'loading-indicator';
+            newLoadingIndicator.innerHTML = '<div class="spinner"></div><div>加载中...</div>';
+            newLoadingIndicator.style.display = 'flex';
+            document.body.appendChild(newLoadingIndicator);
+        }
+        
+        // 重置标志，防止重复调用
+        filterEnabled = false;
+
+        const formData = new FormData();
+        
+        // 获取选中的值
+        const firstLevelSelect = $('#first_level').val() || [];
+        const secondLevelSelect = $('#second_level').val() || [];
+        const thirdLevelSelect = $('#third_level').val() || [];
+        
+        console.log('筛选条件:', firstLevelSelect, secondLevelSelect, thirdLevelSelect);
+        
+        // 检查是否所有三个下拉框都有选择
+        if (firstLevelSelect.length === 0 || secondLevelSelect.length === 0 || thirdLevelSelect.length === 0) {
+            alert('请在所有三个下拉框中都选择至少一个选项');
+            if (loadingIndicator) {
+                loadingIndicator.style.display = 'none';
+            }
+            return;
+        }
+        
+        // 添加到表单数据
+        firstLevelSelect.forEach(value => formData.append('first_level[]', value));
+        secondLevelSelect.forEach(value => formData.append('second_level[]', value));
+        thirdLevelSelect.forEach(value => formData.append('third_level[]', value));
+        
+        // 清除之前的筛选图层
+        Object.values(extraLayers).forEach(layer => {
+            if (map.hasLayer(layer)) {
+                map.removeLayer(layer);
+            }
+        });
+        extraLayers = {};
+        
+        // 发送筛选请求
+        fetch('/filter', {
+            method: 'POST',
+            body: formData
+        })
+        .then(response => {
+            if (!response.ok) {
+                throw new Error(`HTTP error! Status: ${response.status}`);
+            }
+            return response.json();
+        })
+        .then(data => {
+            console.log('筛选结果:', Object.keys(data).length, '个图层');
+            
+            if (Object.keys(data).length === 0) {
+                alert('没有找到符合条件的图层');
+                return;
+            }
+            
+            // 处理筛选结果
+            Object.entries(data).forEach(([layerName, geoJsonData]) => {
+                try {
+                    console.log(`处理图层: ${layerName}`);
+                    // 解析GeoJSON数据
+                    const parsedData = typeof geoJsonData === 'string' ? JSON.parse(geoJsonData) : geoJsonData;
+                    
+                    // 创建图层并添加到地图
+                const layerColor = getLayerColor(layerName);
+                    const layer = L.geoJSON(parsedData, {
+                        style: function() {
+                            return {
+                        color: layerColor,
+                        weight: 2,
+                                opacity: 0.8,
+                                fillOpacity: 0.4
+                            };
+                        },
+                        pointToLayer: function(feature, latlng) {
+                            return L.circleMarker(latlng, {
+                                radius: 5,
+                                fillColor: layerColor,
+                                color: "#000",
+                                weight: 1,
+                        opacity: 1,
+                                fillOpacity: 0.8
+                            });
+                        },
+                        onEachFeature: function(feature, layer) {
+                            // 使用图层名称作为tooltip
+                            layer.bindTooltip(layerName, {
+                                permanent: false,
+                                direction: 'auto',
+                                className: 'layer-name-tooltip'
+                            });
+                        }
+                    });
+                    
+                    // 保存图层引用并添加到地图
+                extraLayers[layerName] = layer;
+                    map.addLayer(layer);
+                    console.log(`图层 ${layerName} 已添加到地图`);
+                } catch (e) {
+                    console.error(`处理图层 ${layerName} 时出错:`, e);
+                }
+            });
+            
+            // 更新extraLayerControl
+            updateExtraLayerControl();
+
+            // 更新图例
+            updateLegend({...currentLayers, ...planLayers, ...extraLayers});
+            
+            console.log('图层处理完成，已更新控件和图例');
+        })
+        .catch(error => {
+            console.error('筛选请求失败:', error);
+            alert('筛选请求失败: ' + error.message);
+        })
+        .finally(() => {
+            // 隐藏加载指示器
+            const indicator = document.getElementById('loading-indicator');
+            if (indicator) {
+                indicator.style.display = 'none';
+            }
+        });
+    }
+
+    // 页面加载完成后设置事件监听器
+    document.addEventListener('DOMContentLoaded', function() {
+        console.log('DOM加载完成，设置事件监听器');
+        
+        // 获取筛选表单和按钮
+        const extraFolderForm = document.getElementById('extraFolderForm');
+        const filterButton = extraFolderForm.querySelector('button[type="submit"]') || 
+                             extraFolderForm.querySelector('button.btn-primary');
+        
+        if (filterButton) {
+            console.log('找到筛选按钮，绑定点击事件');
+            // 移除原有的onclick属性（如果有）
+            filterButton.removeAttribute('onclick');
+            
+            // 绑定新的点击事件
+            filterButton.addEventListener('click', function(e) {
+                console.log('筛选按钮被点击');
+                e.preventDefault();
+                // 设置标志，允许执行筛选
+                filterEnabled = true;
+                filterExtraFolders();
+            });
+        } else {
+            console.error('未找到筛选按钮');
+        }
+        
+        // 阻止表单的默认提交行为
+        if (extraFolderForm) {
+            extraFolderForm.addEventListener('submit', function(e) {
+                console.log('阻止表单默认提交');
+                e.preventDefault();
+            });
+        }
+        
+        // 加载下拉框选项
+        loadExtraFolderLevels();
+        
+        console.log('初始化完成，等待用户操作');
+    });
+
+    // 阻止表单的默认提交行为
+    document.getElementById('extraFolderForm').addEventListener('submit', function(e) {
+        e.preventDefault();
+    });
+
+    // 优化分批处理函数
+    function processBatch(entries, startIndex, batchSize, tempLayerGroup, originalData) {
+        const endIndex = Math.min(startIndex + batchSize, entries.length);
+        
+        // 处理当前批次
+        for (let i = startIndex; i < endIndex; i++) {
+            const [layerName, geoJsonData] = entries[i];
+            addExtraLayer(layerName, geoJsonData, tempLayerGroup);
+            
+            // 内存优化：处理完一项就从原始数据中删除
+            delete originalData[layerName];
+        }
+        
+        // 如果还有更多数据，安排下一批处理
+        if (endIndex < entries.length) {
+            // 内存优化：延长批次间隔，给浏览器更多时间进行垃圾回收
+            setTimeout(() => {
+                // 尝试垃圾回收
+                clearMemory();
+                processBatch(entries, endIndex, batchSize, tempLayerGroup, originalData);
+            }, 100); // 增加延迟
+        } else {
+            // 所有批次处理完毕，一次性添加到地图
+            tempLayerGroup.addTo(map);
+            
+            // 更新图例和控件
+            updateLegend({ ...currentLayers, ...planLayers, ...extraLayers });
+            updateExtraLayerControl();
+            
+            // 移除加载指示器
+            const loadingIndicator = document.getElementById('loading-indicator');
+            if (loadingIndicator) {
+                document.body.removeChild(loadingIndicator);
+            }
+            
+            // 最终清理
+            clearMemory();
+        }
+    }
+
+    // 优化添加图层函数
+    function addExtraLayer(layerName, geoJsonData, targetGroup) {
+        try {
+            // 内存优化：解析前检查数据大小
+            if (geoJsonData.length > 1000000) { // 如果数据超过1MB
+                console.warn(`图层 ${layerName} 数据过大 (${Math.round(geoJsonData.length/1024)}KB)，可能导致性能问题`);
+            }
+            
+            const parsedData = JSON.parse(geoJsonData);
+                const layerColor = getLayerColor(layerName);
+            
+            // 内存优化：简化样式设置
+            const layer = L.geoJSON(parsedData, {
+                    style: {
+                        color: layerColor,
+                        weight: 2,
+                        opacity: 1,
+                        fillOpacity: 0.2
+                },
+                pointToLayer: function (feature, latlng) {
+                    return L.circleMarker(latlng, {
+                        radius: 5,
+                        fillColor: layerColor,
+                        color: "#000",
+                        weight: 1,
+                        opacity: 1,
+                        fillOpacity: 0.8
+                    });
+                },
+                onEachFeature: function(feature, layer) {
+                    // 内存优化：只在鼠标悬停时创建tooltip
+                    layer.on('mouseover', function() {
+                        if (!layer._tooltip) {
+                            layer.bindTooltip(layerName, {
+                                permanent: false,
+                                direction: 'auto',
+                                sticky: true,
+                                offset: [10, 0],
+                                opacity: 0.9,
+                                className: 'leaflet-tooltip-custom'
+                            });
+                            layer.openTooltip();
+                        }
+                    });
+                }
+            });
+            
+            // 添加到临时图层组
+            layer.addTo(targetGroup);
+            
+            // 保存引用但不立即添加到地图
+            extraLayers[layerName] = layer;
+            extraControl.addOverlay(layer, layerName);
+            
+            // 内存优化：释放临时变量
+            parsedData = null;
+            geoJsonData = null;
+        } catch (e) {
+            console.error(`处理图层 ${layerName} 时出错:`, e);
+        }
+    }
+
+    // 选择全部选项
+    function selectAll(selectId) {
+        const selectElement = document.getElementById(selectId);
+        Array.from(selectElement.options).forEach(option => option.selected = true);
+        $(selectElement).selectpicker('refresh');
+    }
+
+    // 取消全部选项
+    function deselectAll(selectId) {
+        const selectElement = document.getElementById(selectId);
+        Array.from(selectElement.options).forEach(option => option.selected = false);
+        $(selectElement).selectpicker('refresh');
+    }
+
+    function debounce(func, wait) {
+        let timeout;
+        return function(...args) {
+            clearTimeout(timeout);
+            timeout = setTimeout(() => func.apply(this, args), wait);
+        };
+    }
+
+    // 删除关闭所有图层的函数
+    function closeAllFilteredLayers() {
+        // 移除所有筛选出的图层
+        Object.values(extraLayers).forEach(layer => {
+            if (map.hasLayer(layer)) {
+                map.removeLayer(layer);
+            }
+        });
+        
+        // 清空extraLayers对象
+        extraLayers = {};
+        
+        // 更新extraLayerControl
+        updateExtraLayerControl();
+
+        // 更新图例
+        updateLegend({...currentLayers, ...planLayers, ...extraLayers});
+        
+        console.log('已关闭所有筛选图层');
+    }
+
+
+    const debouncedFilterExtraFolders = debounce(filterExtraFolders, 300);  // 300ms 延时
+
+    document.getElementById('first_level').addEventListener('change', debouncedFilterExtraFolders);
+    document.getElementById('second_level').addEventListener('change', debouncedFilterExtraFolders);
+    document.getElementById('third_level').addEventListener('change', debouncedFilterExtraFolders);
+
+
+    // 其他函数（如 loadCurrentLayers、loadPlanLayers 等）保持不变
+    function loadCurrentLayers() {
+        fetch('/base/current-layers')
+            .then(response => response.json())
+            .then(data => {
+                Object.entries(data.current_shapefiles).forEach(([layerName, geoJsonData]) => {
+                    const layerColor = getLayerColor(layerName);
+                    const layer = L.geoJSON(JSON.parse(geoJsonData), {
+                        style: {
+                            color: layerColor,
+                            weight: 2,
+                            opacity: 1,
+                            fillOpacity: 0.2
+                        },
+                        pointToLayer: function (feature, latlng) {
+                            return L.circleMarker(latlng, {
+                                radius: 5,
+                                fillColor: layerColor,
+                                color: "#000",
+                                weight: 1,
+                                opacity: 1,
+                                fillOpacity: 0.8
+                            });
+                        },
+                        onEachFeature: function(feature, layer) {
+                            layer.bindTooltip(layerName, {
+                                permanent: false,
+                                direction: 'auto',
+                                sticky: true,  // 使tooltip跟随鼠标
+                                offset: [10, 0],  // 水平偏移10像素，避免被鼠标遮挡
+                                opacity: 0.9,
+                                className: 'leaflet-tooltip-custom'  // 自定义CSS类
+                            });
+                        }
+                    }).addTo(layerGroup);
+                    currentLayers[layerName] = layer;
+                    
+                    layerControl.addOverlay(layer, layerName);
+                    layer.on('add remove', function() {
+                        updateLegend({ ...currentLayers, ...planLayers, ...extraLayers });
+                    });
+                });
+
+                updateLegend({ ...currentLayers, ...planLayers, ...extraLayers });
+
+                const bounds = layerGroup.getBounds();
+                if (bounds.isValid()) {
+                    map.fitBounds(bounds, { padding: [50, 50] });
+                }
+            })
+            .catch(error => {
+                console.error("Failed to load Current layers:", error);
+            });
+    }
+
+    function loadPlanLayers() {
+        fetch('/base/plan-layers')
+            .then(response => response.json())
+            .then(data => {
+                Object.entries(data.plan_shapefiles).forEach(([layerName, geoJsonData]) => {
+                    const layerColor = getLayerColor(layerName);
+                    const layer = L.geoJSON(JSON.parse(geoJsonData), {
+                        style: {
+                            color: layerColor,
+                            weight: 2,
+                            opacity: 1,
+                            fillOpacity: 0.2
+                        },
+                        pointToLayer: function (feature, latlng) {
+                            return L.circleMarker(latlng, {
+                                radius: 5,
+                                fillColor: layerColor,
+                                color: "#000",
+                                weight: 1,
+                                opacity: 1,
+                                fillOpacity: 0.8
+                            });
+                        },
+                        onEachFeature: function(feature, layer) {
+                            layer.bindTooltip(layerName, {
+                                permanent: false,
+                                direction: 'auto',
+                                sticky: true,  // 使tooltip跟随鼠标
+                                offset: [10, 0],  // 水平偏移10像素，避免被鼠标遮挡
+                                opacity: 0.9,
+                                className: 'leaflet-tooltip-custom'  // 自定义CSS类
+                            });
+                        }
+                    }).addTo(layerGroup);
+                    planLayers[layerName] = layer;
+                    
+                    layerControlCopy.addOverlay(layer, layerName);
+                    layer.on('add remove', function() {
+                        updateLegend({ ...currentLayers, ...planLayers, ...extraLayers });
+                    });
+                });
+
+                updateLegend({ ...currentLayers, ...planLayers, ...extraLayers });
+
+                const bounds = layerGroup.getBounds();
+                if (bounds.isValid()) {
+                    map.fitBounds(bounds, { padding: [50, 50] });
+                }
+            })
+            .catch(error => {
+                console.error("Failed to load Plan layers:", error);
+            });
+    }
+
+
+
+    function loadExtraLayers(page = 1, pageSize = 10) {
+        fetch('/extra-layers', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ page, pageSize })
+        })
+        .then(response => response.json())
+        .then(data => {
+            Object.entries(data.extra_shapefiles).forEach(([layerName, geoJsonData]) => {
+                const layerColor = getLayerColor(layerName);
+                const layer = L.geoJSON(JSON.parse(geoJsonData), {
+                    style: {
+                        color: layerColor,
+                        weight: 2,
+                        opacity: 1,
+                        fillOpacity: 0.2
+                    },
+                    pointToLayer: function (feature, latlng) {
+                        return L.circleMarker(latlng, {
+                            radius: 5,
+                            fillColor: layerColor,
+                            color: "#000",
+                            weight: 1,
+                            opacity: 1,
+                            fillOpacity: 0.8
+                        });
+                    },
+                    onEachFeature: function(feature, layer) {
+                        layer.bindTooltip(layerName, {
+                            permanent: false,
+                            direction: 'auto',
+                            sticky: true,  // 使tooltip跟随鼠标
+                            offset: [10, 0],  // 水平偏移10像素，避免被鼠标遮挡
+                            opacity: 0.9,
+                            className: 'leaflet-tooltip-custom'  // 自定义CSS类
+                        });
+                    }
+                }).addTo(layerGroup);
+                extraLayers[layerName] = layer;
+                layerControl.addOverlay(layer, layerName);
+            });
+
+            updateLegend({ ...currentLayers, ...planLayers, ...extraLayers });
+
+            if (data.hasMore) {
+                loadExtraLayers(page + 1, pageSize);  // 加载下一页
+            }
+        })
+        .catch(error => {
+            console.error("Failed to load Extra layers:", error);
+        });
+    }
+
+
+    // 页面加载时初始化
+    document.addEventListener('DOMContentLoaded', () => {
+        loadCurrentLayers();
+        loadPlanLayers();
+        loadExtraLayers();
+        loadExtraFolderLevels(); // 加载 Extra 文件夹层级列表
+    });
+
+    // 修改updateExtraLayerControl函数中的宽度设置
+    function updateExtraLayerControl() {
+        // 更新extraLayerControl的内容
+        const extraLayersList = document.getElementById('extraLayersList');
+        if (extraLayersList) {
+            extraLayersList.innerHTML = '';
+            
+            Object.entries(extraLayers).forEach(([name, layer]) => {
+                const label = document.createElement('label');
+                
+                const input = document.createElement('input');
+                input.type = 'checkbox';
+                input.checked = map.hasLayer(layer);
+                input.onchange = function() {
+                    if (this.checked) {
+                        map.addLayer(layer);
+                    } else {
+                        map.removeLayer(layer);
+                    }
+        updateLegend({...currentLayers, ...planLayers, ...extraLayers});
+    };
+
+                label.appendChild(input);
+                label.appendChild(document.createTextNode(' ' + name));
+                
+                extraLayersList.appendChild(label);
+            });
+        }
+        
+        // 调整extraLayerControl的宽度
+        const extraLayerControl = document.getElementById('extraLayerControl');
+        if (extraLayerControl) {
+            // 使用固定宽度，不再根据内容动态调整
+            extraLayerControl.style.width = '600px';
+            extraLayerControl.style.minWidth = '600px';
+            extraLayerControl.style.maxWidth = '600px';
+        }
+    }
+
+    // 在初始化地图后添加新控件
+    extraControl.onAdd = function (map) {
+        const container = L.DomUtil.create('div', 'leaflet-control-layers-copy');
+        container.id = 'extraLayerControl';
+        container.style.width = '600px';  // 设置初始宽度
+        container.style.minWidth = '600px';
+        container.style.maxWidth = '600px';
+        
+        // 创建标题栏，包含标题和折叠按钮
+        const headerDiv = document.createElement('div');
+        headerDiv.style.display = 'flex';
+        headerDiv.style.justifyContent = 'space-between';
+        headerDiv.style.alignItems = 'center';
+        headerDiv.style.marginBottom = '5px';
+        
+        // 添加标题
+        const titleDiv = document.createElement('div');
+        titleDiv.innerHTML = '<strong>设计方案</strong>';
+        headerDiv.appendChild(titleDiv);
+        
+        // 添加折叠按钮
+        const collapseBtn = document.createElement('button');
+        collapseBtn.innerHTML = '−';  // 使用减号表示折叠
+        collapseBtn.style.width = '24px';
+        collapseBtn.style.height = '24px';
+        collapseBtn.style.border = '1px solid #ccc';
+        collapseBtn.style.borderRadius = '3px';
+        collapseBtn.style.background = 'white';
+        collapseBtn.style.cursor = 'pointer';
+        collapseBtn.title = '折叠/展开';
+        
+        // 设置折叠/展开功能
+        setupCollapseButton(collapseBtn, container, 'extra');
+        
+        headerDiv.appendChild(collapseBtn);
+        
+        // 创建按钮区域和内容区域
+        const buttonsDiv = document.createElement('div');
+        buttonsDiv.className = 'leaflet-control-buttons';
+        buttonsDiv.innerHTML = `
+            <button style="float: left;">全部打开</button>
+            <button style="float: right;">全部关闭</button>
+        `;
+        
+        const listDiv = document.createElement('div');
+        listDiv.className = 'leaflet-control-layers-overlays';
+        listDiv.id = 'extraLayersList';
+        
+        // 添加各个元素到容器
+        container.appendChild(headerDiv);
+        container.appendChild(buttonsDiv);
+        container.appendChild(listDiv);
+
+        // 添加按钮事件处理
+        buttonsDiv.querySelector('button:nth-child(1)').onclick = () => {
+            Object.values(extraLayers).forEach(layer => map.addLayer(layer));
+        updateLegend({...currentLayers, ...planLayers, ...extraLayers});
+            updateExtraLayerControl();
+    };
+
+        buttonsDiv.querySelector('button:nth-child(2)').onclick = () => {
+            Object.values(extraLayers).forEach(layer => map.removeLayer(layer));
+        updateLegend({...currentLayers, ...planLayers, ...extraLayers});
+            updateExtraLayerControl();
+        };
+        
+        // 初始设置为展开状态
+        container.classList.add('control-expanded');
+        
+        return container;
+    };
+    extraControl.addTo(map);
+
+    // 添加CSS样式，确保图例项目样式一致
+    const styleElement = document.createElement('style');
+    styleElement.textContent = `
+        .leaflet-legend {
+            font-family: Arial, sans-serif;
+            font-size: 12px;
+            line-height: 1.5;
+        }
+        .legend-item {
+            margin: 5px 0;
+            display: flex;
+            align-items: center;
+        }
+        .legend-color {
+            width: 16px;
+            height: 16px;
+            margin-right: 8px;
+            border-radius: 2px;
+        }
+        /* 滚动条样式 */
+        .leaflet-legend::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+        .leaflet-legend::-webkit-scrollbar-track {
+            background: #f1f1f1;
+            border-radius: 3px;
+        }
+        .leaflet-legend::-webkit-scrollbar-thumb {
+            background: #888;
+            border-radius: 3px;
+        }
+        .leaflet-legend::-webkit-scrollbar-thumb:hover {
+            background: #555;
+        }
+    `;
+    document.head.appendChild(styleElement);
+
+    // 防止在控件上滚动鼠标滚轮时缩放地图
+    function preventWheelPropagation(element) {
+        if (!element) return;
+        
+        element.addEventListener('wheel', function(e) {
+            // 无条件阻止事件传播到地图
+            e.stopPropagation();
+            
+            // 仅当控件不可滚动或已到达滚动边界时阻止默认行为
+            const isScrollable = this.scrollHeight > this.clientHeight;
+            const isScrollingDown = e.deltaY > 0;
+            const isScrollingUp = e.deltaY < 0;
+            const isAtTop = this.scrollTop === 0;
+            const isAtBottom = this.scrollTop + this.clientHeight >= this.scrollHeight - 1;
+            
+            // 如果控件不可滚动，或者已经滚动到边界，阻止默认滚动行为
+            if (!isScrollable || 
+                (isScrollingUp && isAtTop) || 
+                (isScrollingDown && isAtBottom)) {
+                e.preventDefault();
+            }
+            
+            // 注意：这里不返回，确保事件被阻止传播到地图
+        }, { passive: false });
+    }
+
+    // 等待所有控件加载完成后应用阻止滚轮传播
+    document.addEventListener('DOMContentLoaded', function() {
+        // 设置图例控件
+        const legendElement = document.querySelector('.leaflet-legend');
+        if (legendElement) {
+            preventWheelPropagation(legendElement);
+        }
+        
+        // 设置左下角的所有控件
+        const controlLayers = document.querySelectorAll('.leaflet-control-layers-expanded');
+        controlLayers.forEach(function(control) {
+            preventWheelPropagation(control);
+        });
+    });
+
+    // 监听控件创建
+    map.on('layeradd', function() {
+        setTimeout(function() {
+            // 重新查找所有控件并应用滚轮阻止
+            const legendElement = document.querySelector('.leaflet-legend');
+            if (legendElement) {
+                preventWheelPropagation(legendElement);
+            }
+            
+            const controlLayers = document.querySelectorAll('.leaflet-control-layers-expanded');
+            controlLayers.forEach(function(control) {
+                preventWheelPropagation(control);
+            });
+        }, 100);
+    });
+
+    // 在创建layerControl后，添加事件监听
+    layerControl.on('add remove', function(e) {
+        // 更新图例
+        updateLegend({ ...currentLayers, ...planLayers, ...extraLayers });
+    });
+
+    // 在脚本末尾添加layerControlCopy的事件监听
+    layerControlCopy.on('add remove', function(e) {
+        // 更新图例
+        updateLegend({ ...currentLayers, ...planLayers, ...extraLayers });
+    });
+
+    // 改进的保存视图函数，包含筛选条件
+    function saveViewDirectly() {
+        console.log("开始保存视图...");
+        
+        // 收集当前视图信息
+        const viewData = {
+            center: map.getCenter(),
+            zoom: map.getZoom(),
+            layers: {
+                current: {},
+                plan: {},
+                extra: {}
+            },
+            // 保存筛选条件
+            filters: {
+                first_level: $('#first_level').val() || [],
+                second_level: $('#second_level').val() || [],
+                third_level: $('#third_level').val() || []
+            },
+            // 保存筛选出的图层信息
+            extraLayersInfo: {},
+            timestamp: new Date().toISOString()
+        };
+        
+        // 收集当前图层状态
+        Object.entries(currentLayers).forEach(([name, layer]) => {
+            viewData.layers.current[name] = map.hasLayer(layer);
+        });
+        
+        Object.entries(planLayers).forEach(([name, layer]) => {
+            viewData.layers.plan[name] = map.hasLayer(layer);
+        });
+        
+        // 保存筛选出的图层及其状态
+        Object.entries(extraLayers).forEach(([name, layer]) => {
+            viewData.layers.extra[name] = map.hasLayer(layer);
+            
+            // 保存图层的GeoJSON数据
+            if (layer && layer.toGeoJSON) {
+                try {
+                    viewData.extraLayersInfo[name] = {
+                        geoJson: layer.toGeoJSON(),
+                        color: getLayerColor(name)
+                    };
+                } catch (e) {
+                    console.warn(`无法保存图层 ${name} 的GeoJSON数据:`, e);
+                }
+            }
+        });
+        
+        console.log("视图数据收集完成:", viewData);
+        
+        // 转换为JSON
+        const jsonData = JSON.stringify(viewData, null, 2);
+        
+        // 创建下载链接
+        const blob = new Blob([jsonData], {type: 'application/json'});
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `map_view_${new Date().toISOString().replace(/[:.]/g, '-')}.json`;
+        
+        console.log("准备下载文件...");
+        document.body.appendChild(a);
+        a.click();
+        
+        // 清理
+        setTimeout(() => {
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+            console.log("文件下载完成，清理完成");
+        }, 100);
+    }
+
+    // 改进的加载视图函数，增强错误处理
+    function loadViewDirectly(file) {
+        if (!file) {
+            console.error("没有选择文件");
+            return;
+        }
+        
+        console.log("开始加载视图文件:", file.name);
+        
+        const reader = new FileReader();
+        
+        reader.onload = function(e) {
+            try {
+                console.log("文件读取完成，解析JSON...");
+                let viewData;
+                
+                try {
+                    viewData = JSON.parse(e.target.result);
+                    console.log("JSON解析成功:", viewData);
+                } catch (parseError) {
+                    console.error("JSON解析失败:", parseError);
+                    alert('JSON解析失败: ' + parseError.message);
+                    return;
+                }
+                
+                // 设置地图中心和缩放级别
+                try {
+                    if (viewData.center && viewData.zoom) {
+                        console.log(`设置地图视图: 中心点 [${viewData.center.lat}, ${viewData.center.lng}], 缩放级别 ${viewData.zoom}`);
+                        map.setView([viewData.center.lat, viewData.center.lng], viewData.zoom);
+                    }
+                } catch (viewError) {
+                    console.error("设置地图视图失败:", viewError);
+                    // 继续执行，不中断流程
+                }
+                
+                // 应用图层状态
+                try {
+                    if (viewData.layers) {
+                        console.log("开始应用图层状态...");
+                        
+                        // 先移除所有图层
+                        try {
+                            Object.values(currentLayers).forEach(layer => {
+                                if (map.hasLayer(layer)) {
+                                    map.removeLayer(layer);
+                                }
+                            });
+                            
+                            Object.values(planLayers).forEach(layer => {
+                                if (map.hasLayer(layer)) {
+                                    map.removeLayer(layer);
+                                }
+                            });
+                            
+                            Object.values(extraLayers).forEach(layer => {
+                                if (map.hasLayer(layer)) {
+                                    map.removeLayer(layer);
+                                }
+                            });
+                        } catch (removeError) {
+                            console.error("移除图层失败:", removeError);
+                            // 继续执行，不中断流程
+                        }
+                        
+                        // 清空extraLayers
+                        try {
+                            extraLayers = {};
+                            console.log("已清空extraLayers");
+                        } catch (clearError) {
+                            console.error("清空extraLayers失败:", clearError);
+                        }
+                        
+                        // 添加应该显示的图层
+                        try {
+                            if (viewData.layers.current) {
+                                Object.entries(viewData.layers.current).forEach(([name, visible]) => {
+                                    try {
+                                        if (visible && currentLayers[name]) {
+                                            console.log(`添加现状图层: ${name}`);
+                                            map.addLayer(currentLayers[name]);
+                                        }
+                                    } catch (e) {
+                                        console.error(`添加现状图层 ${name} 失败:`, e);
+                                    }
+                                });
+                            }
+                            
+                            if (viewData.layers.plan) {
+                                Object.entries(viewData.layers.plan).forEach(([name, visible]) => {
+                                    try {
+                                        if (visible && planLayers[name]) {
+                                            console.log(`添加规划图层: ${name}`);
+                                            map.addLayer(planLayers[name]);
+                                        }
+                                    } catch (e) {
+                                        console.error(`添加规划图层 ${name} 失败:`, e);
+                                    }
+                                });
+                            }
+                        } catch (addLayerError) {
+                            console.error("添加基础图层失败:", addLayerError);
+                        }
+                        
+                        // 恢复筛选条件
+                        try {
+                            if (viewData.filters) {
+                                console.log("恢复筛选条件:", viewData.filters);
+                                
+                                // 设置下拉框选中值
+                                if (viewData.filters.first_level && $('#first_level').length) {
+                                    $('#first_level').val(viewData.filters.first_level);
+                                    console.log("已设置first_level:", viewData.filters.first_level);
+                                }
+                                
+                                if (viewData.filters.second_level && $('#second_level').length) {
+                                    $('#second_level').val(viewData.filters.second_level);
+                                    console.log("已设置second_level:", viewData.filters.second_level);
+                                }
+                                
+                                if (viewData.filters.third_level && $('#third_level').length) {
+                                    $('#third_level').val(viewData.filters.third_level);
+                                    console.log("已设置third_level:", viewData.filters.third_level);
+                                }
+                            }
+                        } catch (filterError) {
+                            console.error("恢复筛选条件失败:", filterError);
+                        }
+                        
+                        // 恢复筛选出的图层
+                        try {
+                            if (viewData.extraLayersInfo) {
+                                console.log("恢复筛选出的图层...");
+                                
+                                Object.entries(viewData.extraLayersInfo).forEach(([name, info]) => {
+                                    try {
+                                        if (info.geoJson) {
+                                            console.log(`恢复设计方案图层: ${name}`);
+                                            
+                                            // 创建图层
+                                            const layer = L.geoJSON(info.geoJson, {
+                                                style: function() {
+                                                    return {
+                                                        color: info.color || getLayerColor(name),
+                                                        weight: 2,
+                                                        opacity: 0.8,
+                                                        fillOpacity: 0.4
+                                                    };
+                                                },
+                                                pointToLayer: function(feature, latlng) {
+                                                    return L.circleMarker(latlng, {
+                                                        radius: 5,
+                                                        fillColor: info.color || getLayerColor(name),
+                                                        color: "#000",
+                                                        weight: 1,
+                                                        opacity: 1,
+                                                        fillOpacity: 0.8
+                                                    });
+                                                },
+                                                onEachFeature: function(feature, layer) {
+                                                    // 使用图层名称作为tooltip
+                                                    layer.bindTooltip(name, {
+                                                        permanent: false,
+                                                        direction: 'auto',
+                                                        sticky: true,
+                                                        offset: [10, 0],
+                                                        opacity: 0.9,
+                                                        className: 'leaflet-tooltip-custom'
+                                                    });
+                                                }
+                                            });
+                                            
+                                            // 保存引用
+                                            extraLayers[name] = layer;
+                                            
+                                            // 如果该图层应该显示，则添加到地图
+                                            if (viewData.layers.extra && viewData.layers.extra[name]) {
+                                                map.addLayer(layer);
+                                            }
+                                        }
+                                    } catch (layerError) {
+                                        console.error(`恢复设计方案图层 ${name} 失败:`, layerError);
+                                    }
+                                });
+                                
+                                // 更新extraControl
+                                try {
+                                    updateExtraLayerControl();
+                                    console.log("已更新extraControl");
+                                } catch (updateError) {
+                                    console.error("更新extraControl失败:", updateError);
+                                }
+                            }
+                        } catch (extraLayerError) {
+                            console.error("恢复筛选出的图层失败:", extraLayerError);
+                        }
+                        
+                        // 更新图例
+                        try {
+                            console.log("更新图例...");
+        updateLegend({...currentLayers, ...planLayers, ...extraLayers});
+                            console.log("图层应用完成");
+                        } catch (legendError) {
+                            console.error("更新图例失败:", legendError);
+                        }
+                    }
+                } catch (mainError) {
+                    console.error("应用图层状态失败:", mainError);
+                    alert('应用图层状态失败: ' + mainError.message);
+                    return;
+                }
+                
+                // 显示加载成功消息
+                alert('视图加载成功！');
+                
+            } catch (error) {
+                console.error('加载视图文件失败:', error);
+                alert('加载视图文件失败: ' + error.message);
+            }
+        };
+        
+        reader.onerror = function(error) {
+            console.error('读取文件时出错:', error);
+            alert('读取文件时出错: ' + (error.message || '未知错误'));
+        };
+        
+        reader.readAsText(file);
+    }
+
+    // 添加视图管理控件到地图
+    function addViewManagementControl() {
+        // 创建自定义控件
+        const ViewManagementControl = L.Control.extend({
+            options: {
+                position: 'topleft'  // 与全图按钮相同的位置
+            },
+            
+            onAdd: function(map) {
+                const container = L.DomUtil.create('div', 'leaflet-bar leaflet-control');
+                container.style.marginTop = '10px';  // 在全图按钮下方留出空间
+                container.style.clear = 'both';
+                container.style.backgroundColor = 'white';
+                
+                // 保存按钮
+                const saveButton = L.DomUtil.create('a', '', container);
+                saveButton.href = '#';
+                saveButton.title = '保存当前视图';
+                saveButton.innerHTML = '💾';
+                saveButton.style.display = 'block';
+                saveButton.style.textAlign = 'center';
+                saveButton.style.lineHeight = '30px';
+                saveButton.style.width = '30px';
+                saveButton.style.height = '30px';
+                
+                // 加载按钮
+                const loadButton = L.DomUtil.create('a', '', container);
+                loadButton.href = '#';
+                loadButton.title = '加载视图';
+                loadButton.innerHTML = '📂';
+                loadButton.style.display = 'block';
+                loadButton.style.textAlign = 'center';
+                loadButton.style.lineHeight = '30px';
+                loadButton.style.width = '30px';
+                loadButton.style.height = '30px';
+                
+                // 隐藏的文件输入
+                const fileInput = L.DomUtil.create('input', '', container);
+                fileInput.type = 'file';
+                fileInput.style.display = 'none';
+                fileInput.accept = '.json';
+                fileInput.id = 'viewFileInput';
+                
+                // 添加事件处理
+                L.DomEvent.on(saveButton, 'click', function(e) {
+                    L.DomEvent.stopPropagation(e);
+                    L.DomEvent.preventDefault(e);
+                    saveViewDirectly();
+                });
+                
+                L.DomEvent.on(loadButton, 'click', function(e) {
+                    L.DomEvent.stopPropagation(e);
+                    L.DomEvent.preventDefault(e);
+                    fileInput.click();
+                });
+                
+                L.DomEvent.on(fileInput, 'change', function(e) {
+                    if (fileInput.files.length > 0) {
+                        loadViewDirectly(fileInput.files[0]);
+                    }
+                });
+                
+                return container;
+            }
+        });
+        
+        // 添加控件到地图
+        return new ViewManagementControl().addTo(map);
+    }
+
+    // 在地图初始化后添加视图管理控件
+    const viewManagementControl = addViewManagementControl();
+
+    // 增加左下角控件的宽度
+    function updateControlWidth() {
+        // 更新currentLayerControl宽度
+        if (document.getElementById('currentLayerControl')) {
+            const currentLayerControl = document.getElementById('currentLayerControl');
+            currentLayerControl.style.width = '300px';
+            currentLayerControl.style.minWidth = '300px';
+        }
+        
+        // 更新planLayerControl宽度
+        if (document.getElementById('planLayerControl')) {
+            const planLayerControl = document.getElementById('planLayerControl');
+            planLayerControl.style.width = '300px';
+            planLayerControl.style.minWidth = '300px';
+        }
+        
+        // 更新extraLayerControl宽度
+        if (document.getElementById('extraLayerControl')) {
+            const extraLayerControl = document.getElementById('extraLayerControl');
+            extraLayerControl.style.width = '600px';
+            extraLayerControl.style.minWidth = '600px';
+        }
+    }
+
+    // 在地图加载完成后调用
+    map.on('load', function() {
+        updateControlWidth();
+    });
+
+    // 创建tooltip内容的函数
+    function createTooltipContent(properties) {
+        if (!properties) return "无属性信息";
+        
+        let content = '<div style="max-width: 300px;">';
+        
+        // 添加标题（如果有）
+        if (properties.name || properties.NAME || properties.title || properties.TITLE) {
+            const title = properties.name || properties.NAME || properties.title || properties.TITLE;
+            content += `<div style="font-weight: bold; margin-bottom: 5px;">${title}</div>`;
+        }
+        
+        // 添加所有属性
+        content += '<table style="width: 100%; border-collapse: collapse;">';
+        for (const key in properties) {
+            if (properties.hasOwnProperty(key) && properties[key] !== null && properties[key] !== undefined) {
+                // 跳过已经作为标题显示的属性
+                if (key.toLowerCase() === 'name' || key.toLowerCase() === 'title') continue;
+                
+                content += `<tr>
+                    <td style="padding: 2px; border-bottom: 1px solid #eee; font-weight: bold;">${key}:</td>
+                    <td style="padding: 2px; border-bottom: 1px solid #eee;">${properties[key]}</td>
+                </tr>`;
+            }
+        }
+        content += '</table></div>';
+        
+        return content;
+    }
+
+    // 修改筛选函数，确保添加图层名称的tooltip
+    function filterLayers() {
+        // 获取筛选条件
+        const firstLevel = $('#first_level').val() || [];
+        const secondLevel = $('#second_level').val() || [];
+        const thirdLevel = $('#third_level').val() || [];
+        
+        console.log('筛选条件:', firstLevel, secondLevel, thirdLevel);
+        
+        // 清除现有的筛选图层
+        Object.values(extraLayers).forEach(layer => {
+            if (map.hasLayer(layer)) {
+                map.removeLayer(layer);
+            }
+        });
+        extraLayers = {};
+        
+        // 如果没有选择任何条件，则不显示任何图层
+        if (firstLevel.length === 0 && secondLevel.length === 0 && thirdLevel.length === 0) {
+            updateExtraLayerControl();
+            updateLegend({...currentLayers, ...planLayers, ...extraLayers});
+            return;
+        }
+        
+        // 筛选符合条件的图层
+        Object.entries(allDesignLayers).forEach(([name, layer]) => {
+            // 检查是否符合筛选条件
+            const layerData = layer.toGeoJSON();
+            let shouldInclude = false;
+            
+            layerData.features.forEach(feature => {
+                const props = feature.properties;
+                
+                // 检查是否符合一级筛选条件
+                const matchFirstLevel = firstLevel.length === 0 || 
+                    (props.first_level && firstLevel.includes(props.first_level));
+                
+                // 检查是否符合二级筛选条件
+                const matchSecondLevel = secondLevel.length === 0 || 
+                    (props.second_level && secondLevel.includes(props.second_level));
+                
+                // 检查是否符合三级筛选条件
+                const matchThirdLevel = thirdLevel.length === 0 || 
+                    (props.third_level && thirdLevel.includes(props.third_level));
+                
+                // 如果同时符合所有筛选条件，则包含该图层
+                if (matchFirstLevel && matchSecondLevel && matchThirdLevel) {
+                    shouldInclude = true;
+                }
+            });
+            
+            if (shouldInclude) {
+                // 创建新的GeoJSON图层
+                const filteredLayer = L.geoJSON(layerData, {
+                    style: function() {
+                        return {
+                            color: getLayerColor(name),
+                            weight: 2,
+                            opacity: 0.8,
+                            fillOpacity: 0.4
+                        };
+                    },
+                    onEachFeature: function(feature, layer) {
+                        // 添加图层名称作为tooltip
+                        layer.bindTooltip(name, {
+                            permanent: false,
+                            direction: 'auto',
+                            className: 'layer-name-tooltip'
+                        });
+                    }
+                });
+                
+                // 添加到extraLayers
+                extraLayers[name] = filteredLayer;
+                
+                // 添加到地图
+                map.addLayer(filteredLayer);
+            }
+        });
+        
+        // 更新extraLayerControl
+        updateExtraLayerControl();
+        
+        // 更新图例
+        updateLegend({...currentLayers, ...planLayers, ...extraLayers});
+    }
+
+    </script>
+</body>
+</html>
+
+
